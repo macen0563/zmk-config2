@@ -1,4 +1,4 @@
-name: Build ZMK firmware
+name: Build ZMK Firmware
 
 on:
   workflow_dispatch:
@@ -8,14 +8,46 @@ on:
       - .github/workflows/build.yml
 
 jobs:
-  build_left:
-    uses: zmkfirmware/zmk/.github/workflows/build.yml@main
-    with:
-      board: nice_nano_v2
-      shield: lily58_left
+  build:
+    runs-on: ubuntu-latest
 
-  build_right:
-    uses: zmkfirmware/zmk/.github/workflows/build.yml@main
-    with:
-      board: nice_nano_v2
-      shield: lily58_right
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build gperf ccache dfu-util device-tree-compiler wget python3-pip
+          pip3 install west
+
+      - name: Initialize west
+        run: |
+          west init -l config
+          west update
+
+      - name: Build Lily58 Left
+        run: |
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=lily58_left -DZMK_CONFIG=${GITHUB_WORKSPACE}/config
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
+
+      - name: Upload Left Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: lily58_left
+          path: build/zephyr/zmk.uf2
+
+      - name: Build Lily58 Right
+        run: |
+          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=lily58_right -DZMK_CONFIG=${GITHUB_WORKSPACE}/config
+        env:
+          ZEPHYR_BASE: ${{ github.workspace }}/zephyr
+
+      - name: Upload Right Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: lily58_right
+          path: build/zephyr/zmk.uf2
